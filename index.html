@@ -124,12 +124,27 @@ const byNo={}; QUESTIONS.forEach(q=>byNo[q.no]=q);
 function saveHistory(){
   try{ localStorage.setItem('gw_historyWrong', JSON.stringify([...historyWrong])); }catch(e){}
 }
+// ===== 进度自动保存/恢复（新增）=====
+var PROG_KEY='gw_progress_v1';
+function saveProgress(){ try{ if(orderList&&orderList.length){ localStorage.setItem(PROG_KEY, JSON.stringify({orderList:orderList, pos:pos, selectedChap:selectedChap, mode:mode, at:Date.now()})); } }catch(e){} }
+function tryLoadProgress(){
+  try{ const raw=localStorage.getItem(PROG_KEY); if(!raw) return null;
+    const d=JSON.parse(raw); if(!d||!d.orderList||!d.orderList.length||typeof d.pos!=='number') return null;
+    if(d.pos>=d.orderList.length) return null;
+    if(d.selectedChap!==selectedChap) return null; // 章节变了，放弃旧进度
+    return d;
+  }catch(e){ return null; }
+}
+function clearProgress(){ try{ localStorage.removeItem(PROG_KEY); }catch(e){} }
+
 function refreshHistBtn(){
   const b=document.getElementById('histBtn');
   if(b){ b.innerHTML='📌 练历史错题('+historyWrong.size+')'; b.style.display=historyWrong.size?'':'none'; }
 }
 
 function startQuiz(){
+  var savedTry=tryLoadProgress();
+  if(savedTry){ orderList=savedTry.orderList; pos=savedTry.pos; selectedChap=savedTry.selectedChap; mode=savedTry.mode; var chill=document.getElementById('chapSel'); if(chill) chill.value=(selectedChap==='all'?'all':selectedChap); saveProgress(); return render(); }
   orderList=buildOrderList();
   pos=0; stat.right=0; stat.wrong=0; wrongIds=new Set();
   answered=false;
@@ -166,6 +181,7 @@ function render(){
   next.disabled=true;
   next.onclick=()=>{ if(answered){pos++; answered=false; render();} };
   updateBar();
+  saveProgress();
 }
 
 function answer(i){
@@ -207,6 +223,7 @@ function updateBar(){
 }
 
 function showDone(area){
+  clearProgress();
   const rate=stat.total?Math.round(stat.right/stat.total*100):0;
   let msg= rate>=90?'🏆 太强了！':rate>=70?'👍 很棒！':rate>=50?'💪 继续加油！':'📚 需要加强复习';
   area.innerHTML='<div class="done"><h2>🎉 本轮完成！</h2>'+
@@ -246,6 +263,8 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 document.getElementById('modeOrder').onclick=()=>{mode='order';document.getElementById('modeOrder').classList.add('active');document.getElementById('modeRandom').classList.remove('active');startQuiz();};
 document.getElementById('modeRandom').onclick=()=>{mode='random';document.getElementById('modeRandom').classList.add('active');document.getElementById('modeOrder').classList.remove('active');startQuiz();};
 sel.onchange=()=>{selectedChap=sel.value==='all'?'all':parseInt(sel.value);startQuiz();};
+// 错题练习按钮（修复：绑定点击事件）
+var hb=document.getElementById('histBtn'); if(hb){ hb.onclick=practiceHistory; }
 
 startQuiz();
 </script>
